@@ -69,7 +69,10 @@ export default function ProblemSetIntroView({ problemSetId }: ProblemSetIntroVie
   const firstUnsolvedQuestion = detail.questions.find(
     (question) => question.status === 'notStarted',
   );
-  const firstQuestion = firstUnsolvedQuestion ?? detail.questions[0];
+  const firstQuestion =
+    detail.questions.find((question) => question.status === 'awaitingSelfGrade') ??
+    firstUnsolvedQuestion ??
+    detail.questions[0];
   const firstQuestionHref = firstQuestion
     ? `/problem/${problemSetId}/questions/${firstQuestion.id}`
     : `/problem/${problemSetId}`;
@@ -109,6 +112,7 @@ export default function ProblemSetIntroView({ problemSetId }: ProblemSetIntroVie
             summary={detail.summary}
             actionLabel={detail.summary.solvedCount > 0 ? '이어서 시작' : '시작하기'}
             actionHref={firstQuestionHref}
+            actionDisabled={!firstQuestion}
           />
 
           <ProblemTocCard problemSetId={problemSetId} questions={detail.questions} />

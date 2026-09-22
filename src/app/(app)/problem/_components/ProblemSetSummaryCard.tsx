@@ -13,6 +13,7 @@ type ProblemSetSummaryCardProps = {
   summary: ProblemSetSummary;
   actionLabel: string;
   actionHref: string;
+  actionDisabled?: boolean;
   onActionClick?: MouseEventHandler<HTMLAnchorElement>;
   showProgress?: boolean;
 };
@@ -22,6 +23,7 @@ export default function ProblemSetSummaryCard({
   summary,
   actionLabel,
   actionHref,
+  actionDisabled = false,
   onActionClick,
   showProgress = true,
 }: ProblemSetSummaryCardProps) {
@@ -29,6 +31,12 @@ export default function ProblemSetSummaryCard({
     summary.totalCount <= 0
       ? 0
       : Math.min(100, Math.max(0, (summary.solvedCount / summary.totalCount) * 100));
+  const actionContent = (
+    <>
+      <ProblemActionIcon className="h-[16px] w-[16px] shrink-0" />
+      <span>{actionLabel}</span>
+    </>
+  );
 
   return (
     <section className="bg-bg-white mx-auto flex h-[151.52px] w-[1060px] overflow-hidden rounded-[15px]">
@@ -71,15 +79,19 @@ export default function ProblemSetSummaryCard({
         </div>
 
         <Button
-          asChild
+          asChild={!actionDisabled}
+          disabled={actionDisabled}
           size={46}
           width={128}
           className="ml-[32px] shrink-0 gap-[16px] !text-[16px]"
         >
-          <Link href={actionHref} onClick={onActionClick}>
-            <ProblemActionIcon className="h-[16px] w-[16px] shrink-0" />
-            <span>{actionLabel}</span>
-          </Link>
+          {actionDisabled ? (
+            actionContent
+          ) : (
+            <Link href={actionHref} onClick={onActionClick}>
+              {actionContent}
+            </Link>
+          )}
         </Button>
       </div>
 

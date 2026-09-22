@@ -18,6 +18,13 @@ function ResultStatusIcon({ status }: { status: ProblemResultRow['status'] }) {
   if (status === 'incorrect') {
     return <ProblemStatusIcon type="incorrect" />;
   }
+  if (status === 'awaitingSelfGrade' || status === 'notStarted') {
+    return (
+      <span className="text-[16px] text-gray-600">
+        {status === 'awaitingSelfGrade' ? '채점 대기' : '미풀이'}
+      </span>
+    );
+  }
   return <ProblemStatusIcon type="skipped" />;
 }
 
@@ -53,7 +60,7 @@ export default function ProblemResultTable({ problemSetId, rows }: ProblemResult
                 <span className="truncate font-medium">{row.title}</span>
               </Link>
 
-              <div className="absolute top-0 left-[446px] flex h-[46px] w-[24px] items-center justify-center">
+              <div className="absolute top-0 left-[398px] flex h-[46px] w-[120px] items-center justify-center">
                 <ResultStatusIcon status={row.status} />
               </div>
 

@@ -91,7 +91,7 @@ export default function ProblemResultView({ problemSetId }: ProblemResultViewPro
     questionId: question.id,
     no: question.no,
     title: question.title,
-    status: question.status === 'notStarted' ? 'skipped' : question.status,
+    status: question.status,
     elapsedTime: question.elapsedSeconds > 0 ? formatElapsedTime(question.elapsedSeconds) : '',
   }));
   const summary = {
@@ -102,10 +102,16 @@ export default function ProblemResultView({ problemSetId }: ProblemResultViewPro
   };
 
   const handleRestart = async () => {
+    if (retryProblemSetMutation.isPending || result.questions.length === 0) return;
     try {
-      await retryProblemSetMutation.mutateAsync({ userId, problemSetId });
+      const restartedSet = await retryProblemSetMutation.mutateAsync({ userId, problemSetId });
       resetSession();
-      router.push(firstQuestionHref);
+      const restartedQuestion = restartedSet.questions[0];
+      router.push(
+        restartedQuestion
+          ? `/problem/${problemSetId}/questions/${restartedQuestion.id}`
+          : `/problem/${problemSetId}`,
+      );
     } catch (retryError) {
       window.alert(
         retryError instanceof Error
@@ -145,6 +151,7 @@ export default function ProblemResultView({ problemSetId }: ProblemResultViewPro
             summary={summary}
             actionLabel={retryProblemSetMutation.isPending ? '초기화 중' : '처음부터 시작'}
             actionHref={firstQuestionHref}
+            actionDisabled={retryProblemSetMutation.isPending || !firstQuestion}
             onActionClick={(event) => {
               event.preventDefault();
               if (!retryProblemSetMutation.isPending) {
