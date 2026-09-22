@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { ApiError } from '@/api/client';
+import { useCurrentUser } from '@/queries/auth/useCurrentUser';
 
 import {
   getProblemQuestion,
@@ -16,7 +18,6 @@ import {
 import { problemQueryKeys } from './problemQueryKeys';
 
 type UserQueryParams = {
-  userId?: string;
   enabled?: boolean;
 };
 
@@ -28,27 +29,34 @@ type ProblemQuestionQueryParams = ProblemSetQueryParams & {
   questionId: string;
 };
 
-export function useProblemSets({ userId, enabled = true }: UserQueryParams) {
+function retryProblemQuery(failureCount: number, error: Error) {
+  if (error instanceof ApiError && [401, 403, 404].includes(error.status)) return false;
+  return failureCount < 1;
+}
+
+export function useProblemSets({ enabled = true }: UserQueryParams = {}) {
+  const currentUserQuery = useCurrentUser();
+  const userId = currentUserQuery.data?.account.userId;
   return useQuery({
+    retry: retryProblemQuery,
     queryKey: problemQueryKeys.sets(userId ?? ''),
     queryFn: async ({ signal }) => {
       if (!userId) {
-        return [];
+        throw new Error('사용자 정보를 확인할 수 없습니다.');
       }
 
       const problemSets = await getProblemSets({ signal });
       return problemSets.map(mapProblemSetSummary);
     },
-    enabled: enabled && Boolean(userId),
+    enabled: enabled && currentUserQuery.isSuccess && Boolean(userId),
   });
 }
 
-export function useProblemSetDetail({
-  userId,
-  problemSetId,
-  enabled = true,
-}: ProblemSetQueryParams) {
+export function useProblemSetDetail({ problemSetId, enabled = true }: ProblemSetQueryParams) {
+  const currentUserQuery = useCurrentUser();
+  const userId = currentUserQuery.data?.account.userId;
   return useQuery({
+    retry: retryProblemQuery,
     queryKey: problemQueryKeys.detail(userId ?? '', problemSetId),
     queryFn: async ({ signal }) => {
       if (!userId) {
@@ -57,17 +65,19 @@ export function useProblemSetDetail({
 
       return mapProblemSetDetail(await getProblemSetDetail({ problemSetId, signal }));
     },
-    enabled: enabled && Boolean(userId) && Boolean(problemSetId),
+    enabled: enabled && currentUserQuery.isSuccess && Boolean(userId) && Boolean(problemSetId),
   });
 }
 
 export function useProblemQuestion({
-  userId,
   problemSetId,
   questionId,
   enabled = true,
 }: ProblemQuestionQueryParams) {
+  const currentUserQuery = useCurrentUser();
+  const userId = currentUserQuery.data?.account.userId;
   return useQuery({
+    retry: retryProblemQuery,
     queryKey: problemQueryKeys.question(userId ?? '', problemSetId, questionId),
     queryFn: async ({ signal }) => {
       if (!userId) {
@@ -76,16 +86,20 @@ export function useProblemQuestion({
 
       return mapProblemQuestion(await getProblemQuestion({ problemSetId, questionId, signal }));
     },
-    enabled: enabled && Boolean(userId) && Boolean(problemSetId) && Boolean(questionId),
+    enabled:
+      enabled &&
+      currentUserQuery.isSuccess &&
+      Boolean(userId) &&
+      Boolean(problemSetId) &&
+      Boolean(questionId),
   });
 }
 
-export function useProblemSetResult({
-  userId,
-  problemSetId,
-  enabled = true,
-}: ProblemSetQueryParams) {
+export function useProblemSetResult({ problemSetId, enabled = true }: ProblemSetQueryParams) {
+  const currentUserQuery = useCurrentUser();
+  const userId = currentUserQuery.data?.account.userId;
   return useQuery({
+    retry: retryProblemQuery,
     queryKey: problemQueryKeys.result(userId ?? '', problemSetId),
     queryFn: async ({ signal }) => {
       if (!userId) {
@@ -94,6 +108,6 @@ export function useProblemSetResult({
 
       return mapProblemSetResult(await getProblemSetResult({ problemSetId, signal }));
     },
-    enabled: enabled && Boolean(userId) && Boolean(problemSetId),
+    enabled: enabled && currentUserQuery.isSuccess && Boolean(userId) && Boolean(problemSetId),
   });
 }

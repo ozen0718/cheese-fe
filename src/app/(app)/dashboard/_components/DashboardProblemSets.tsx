@@ -26,9 +26,7 @@ export default function DashboardProblemSets() {
   const [startIndex, setStartIndex] = useState(0);
 
   const currentUserQuery = useCurrentUser();
-  const userId = currentUserQuery.data?.account.userId; // TODO: 타입 에러를 위한 임시 코드로, JWT 인증 방식 전환 시 id값 다시 확인
   const problemSetsQuery = useProblemSets({
-    userId,
     enabled: currentUserQuery.isSuccess,
   });
 
@@ -38,7 +36,8 @@ export default function DashboardProblemSets() {
   );
   const error = currentUserQuery.error ?? problemSetsQuery.error;
   const isLoading =
-    !error && (currentUserQuery.isPending || (Boolean(userId) && problemSetsQuery.isPending));
+    !error &&
+    (currentUserQuery.isPending || (currentUserQuery.isSuccess && problemSetsQuery.isPending));
 
   const maxStartIndex = getProblemCarouselMaxStartIndex(practiceSets.length);
   const visibleStartIndex = Math.min(startIndex, maxStartIndex);
