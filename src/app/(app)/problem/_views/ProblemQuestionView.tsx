@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCurrentUser } from '@/queries/auth/useCurrentUser';
 import {
   useSaveProblemAnswerMutation,
+  useRetryProblemQuestionMutation,
   useSelfGradeProblemQuestionMutation,
   useSubmitProblemAnswerMutation,
 } from '@/queries/problem/useProblemMutations';
@@ -42,6 +43,7 @@ export default function ProblemQuestionView({
     pauseSession,
     finishSession,
     resetSession,
+    resetQuestion,
   } = useProblemSolvingSession();
 
   const [isTocOpen, setIsTocOpen] = useState(false);
@@ -61,8 +63,12 @@ export default function ProblemQuestionView({
   const saveAnswerMutation = useSaveProblemAnswerMutation();
   const submitAnswerMutation = useSubmitProblemAnswerMutation();
   const selfGradeMutation = useSelfGradeProblemQuestionMutation();
+  const retryQuestionMutation = useRetryProblemQuestionMutation();
   const isBusy =
-    saveAnswerMutation.isPending || submitAnswerMutation.isPending || selfGradeMutation.isPending;
+    saveAnswerMutation.isPending ||
+    submitAnswerMutation.isPending ||
+    selfGradeMutation.isPending ||
+    retryQuestionMutation.isPending;
 
   const apiAttempt = useMemo(
     () => (questionQuery.data ? mapProblemAttempt(questionQuery.data) : undefined),
@@ -294,9 +300,18 @@ export default function ProblemQuestionView({
               }
               gradeQuestion(question.id, gradedQuestion.status);
             }}
-            onRetry={() => {
-              window.alert('문제별 다시풀기는 서버 API가 지원된 이후 연결될 예정입니다.');
-              return Promise.resolve(false);
+            onRetry={async () => {
+              await retryQuestionMutation.mutateAsync({
+                userId,
+                problemSetId,
+                questionId: question.id,
+              });
+              resetQuestion(question.id);
+              startQuestion(question.id);
+              if (isReviewMode) {
+                router.replace(`/problem/${problemSetId}/questions/${question.id}`);
+              }
+              return true;
             }}
             onNext={handleNext}
           />
