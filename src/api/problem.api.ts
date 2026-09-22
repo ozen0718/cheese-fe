@@ -1,6 +1,8 @@
 import { apiClient } from './client';
 
-export type ApiProblemStatus = 'notStarted' | 'correct' | 'wrong' | 'skipped';
+export type ApiProblemStatus = 'notStarted' | 'correct' | 'wrong' | 'skipped' | 'awaitingSelfGrade';
+
+export type ApiProblemGradingMode = 'auto' | 'self';
 
 export type ApiProblemAnswer = {
   choiceId?: string;
@@ -44,6 +46,7 @@ export type ApiProblemQuestion = {
   order: number;
   title: string;
   type: 'multipleChoice' | 'shortAnswer';
+  gradingMode: ApiProblemGradingMode;
   question: string;
   description?: string;
   hint?: string;
@@ -51,6 +54,8 @@ export type ApiProblemQuestion = {
   myAnswer?: ApiProblemAnswer;
   status?: ApiProblemStatus;
   elapsedSeconds?: number;
+  correctAnswer?: ApiProblemAnswer;
+  explanation?: string;
 };
 
 export type ApiProblemResultQuestion = {
@@ -58,10 +63,12 @@ export type ApiProblemResultQuestion = {
   order: number;
   title: string;
   type: 'multipleChoice' | 'shortAnswer';
-  status: Exclude<ApiProblemStatus, 'notStarted'>;
-  elapsedSeconds: number;
+  gradingMode: ApiProblemGradingMode;
+  status: ApiProblemStatus;
+  elapsedSeconds?: number;
   myAnswer?: ApiProblemAnswer;
   correctAnswer?: ApiProblemAnswer;
+  explanation?: string;
 };
 
 export type ApiProblemSetResult = {
@@ -72,6 +79,7 @@ export type ApiProblemSetResult = {
   correctQuestionCount: number;
   wrongQuestionCount: number;
   skippedQuestionCount: number;
+  awaitingSelfGradeCount: number;
   accuracy: number;
   totalElapsedSeconds: number;
   completedAt?: string;

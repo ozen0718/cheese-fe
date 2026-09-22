@@ -6,9 +6,14 @@ export type ProblemGradingMode = 'auto' | 'self';
 
 export type ProblemSolveStatus = 'correct' | 'incorrect' | 'pending';
 
-export type ProblemQuestionStatus = 'notStarted' | 'correct' | 'incorrect' | 'skipped';
+export type ProblemQuestionStatus =
+  | 'notStarted'
+  | 'correct'
+  | 'incorrect'
+  | 'skipped'
+  | 'awaitingSelfGrade';
 
-export type ProblemResultStatus = Exclude<ProblemQuestionStatus, 'notStarted'>;
+export type ProblemResultStatus = ProblemQuestionStatus;
 
 export type ProblemChoice = {
   id: string;
@@ -36,6 +41,7 @@ export type ProblemQuestion = {
   type: ProblemQuestionType;
   gradingMode: ProblemGradingMode;
   correctAnswer?: string;
+  description?: string;
   explanation?: string;
   hint: string;
   choices?: ProblemChoice[];
@@ -79,9 +85,11 @@ export type ProblemResultRow = {
 };
 
 export type ProblemResultQuestion = ProblemQuestionListItem & {
+  gradingMode: ProblemGradingMode;
   elapsedSeconds: number;
   myAnswer?: ProblemAnswer;
   correctAnswer?: ProblemAnswer;
+  explanation?: string;
 };
 
 export type ProblemSetResult = {
@@ -92,6 +100,7 @@ export type ProblemSetResult = {
   correctCount: number;
   wrongCount: number;
   skippedCount: number;
+  awaitingSelfGradeCount: number;
   accuracy: number;
   totalElapsedSeconds: number;
   completedAt?: string;

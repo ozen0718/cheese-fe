@@ -192,13 +192,15 @@ export function mapProblemSetDetail(response: ApiProblemSetDetail): ProblemSetDe
     },
     description: response.description,
     correctCount: response.correctQuestionCount,
-    questions: response.questions.map((question) => ({
-      id: question.id,
-      no: question.order,
-      title: question.title,
-      type: question.type,
-      status: mapProblemStatus(question.status),
-    })),
+    questions: [...response.questions]
+      .sort((a, b) => a.order - b.order)
+      .map((question) => ({
+        id: question.id,
+        no: question.order,
+        title: question.title,
+        type: question.type,
+        status: mapProblemStatus(question.status),
+      })),
   };
 }
 
@@ -209,8 +211,12 @@ export function mapProblemQuestion(response: ApiProblemQuestion): ProblemQuestio
     title: response.title,
     question: response.question,
     type: response.type,
-    gradingMode: 'auto',
-    explanation: response.description,
+    gradingMode: response.gradingMode,
+    description: response.description,
+    correctAnswer:
+      response.correctAnswer?.text ??
+      response.choices?.find((choice) => choice.id === response.correctAnswer?.choiceId)?.text,
+    explanation: response.explanation,
     hint: response.hint ?? '',
     choices: response.choices?.map((choice) => ({ id: choice.id, label: choice.text })),
     myAnswer: mapProblemAnswer(response.myAnswer),
@@ -228,18 +234,23 @@ export function mapProblemSetResult(response: ApiProblemSetResult): ProblemSetRe
     correctCount: response.correctQuestionCount,
     wrongCount: response.wrongQuestionCount,
     skippedCount: response.skippedQuestionCount,
+    awaitingSelfGradeCount: response.awaitingSelfGradeCount,
     accuracy: response.accuracy,
     totalElapsedSeconds: response.totalElapsedSeconds,
     completedAt: response.completedAt,
-    questions: response.questions.map((question) => ({
-      id: question.questionId,
-      no: question.order,
-      title: question.title,
-      type: question.type,
-      status: mapProblemStatus(question.status),
-      elapsedSeconds: question.elapsedSeconds,
-      myAnswer: mapProblemAnswer(question.myAnswer),
-      correctAnswer: mapProblemAnswer(question.correctAnswer),
-    })),
+    questions: [...response.questions]
+      .sort((a, b) => a.order - b.order)
+      .map((question) => ({
+        id: question.questionId,
+        no: question.order,
+        title: question.title,
+        type: question.type,
+        gradingMode: question.gradingMode,
+        status: mapProblemStatus(question.status),
+        elapsedSeconds: question.elapsedSeconds ?? 0,
+        myAnswer: mapProblemAnswer(question.myAnswer),
+        correctAnswer: mapProblemAnswer(question.correctAnswer),
+        explanation: question.explanation,
+      })),
   };
 }
