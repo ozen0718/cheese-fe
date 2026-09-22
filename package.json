@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test:problem": "node --import ./tests/register-typescript.mjs --test tests/problem-api.test.mjs",
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "eslint --fix",
