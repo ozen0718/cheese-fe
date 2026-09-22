@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useCurrentUser } from '@/queries/auth/useCurrentUser';
 
 import type { ProblemAttempt, ProblemSolveStatus } from '../_types/problemSolving';
 import { formatProgressDate } from '../_utils/formatProgressDate';
@@ -48,6 +49,7 @@ type ProblemSolvingSessionContextValue = {
   pauseSession: () => void;
   finishSession: () => void;
   resetSession: () => void;
+  resetQuestion: (questionId: string) => void;
 };
 
 const createEmptyAttempt = (): ProblemAttempt => ({
@@ -129,29 +131,51 @@ export function ProblemSolvingSessionProvider({
   problemSetId: string;
   children: ReactNode;
 }) {
-  const storageKey = `cheese:problem-session:${problemSetId}`;
+  const currentUserQuery = useCurrentUser();
+  const userId = currentUserQuery.data?.account.userId;
+  const storageKey = userId ? `cheese:problem-session:v2:${userId}:${problemSetId}` : undefined;
+
+  return (
+    <ProblemSolvingSession key={storageKey ?? 'anonymous'} storageKey={storageKey}>
+      {children}
+    </ProblemSolvingSession>
+  );
+}
+
+function ProblemSolvingSession({
+  storageKey,
+  children,
+}: {
+  storageKey?: string;
+  children: ReactNode;
+}) {
   const [state, setState] = useState<ProblemSolvingSessionState>(createInitialState);
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
+    if (!storageKey) return;
     try {
       const storedValue = window.sessionStorage.getItem(storageKey);
       if (storedValue) {
         setState(sanitizeStoredState(JSON.parse(storedValue)));
       }
     } catch {
-      window.sessionStorage.removeItem(storageKey);
+      // 저장소를 사용할 수 없거나 데이터가 손상되면 메모리에서 풀이를 이어간다.
     } finally {
       setIsHydrated(true);
     }
   }, [storageKey]);
 
   useEffect(() => {
-    if (!isHydrated) {
+    if (!isHydrated || !storageKey) {
       return;
     }
 
-    window.sessionStorage.setItem(storageKey, JSON.stringify(state));
+    try {
+      window.sessionStorage.setItem(storageKey, JSON.stringify(state));
+    } catch {
+      // 저장소 사용 제한이 서버 답안 저장을 막지 않도록 한다.
+    }
   }, [isHydrated, state, storageKey]);
 
   useEffect(() => {
@@ -199,15 +223,29 @@ export function ProblemSolvingSessionProvider({
   const startQuestion = useCallback(
     (questionId: string, options?: { review?: boolean; initialAttempt?: ProblemAttempt }) => {
       setState((currentState) => {
+        const savedAttempt = currentState.attempts[questionId];
+        const serverAttempt = options?.initialAttempt;
         const attempt =
-          currentState.attempts[questionId] ?? options?.initialAttempt ?? createEmptyAttempt();
-        const shouldTrackQuestion = options?.review || !attempt.submitted;
+          serverAttempt?.submitted || savedAttempt?.submitted
+            ? (serverAttempt ?? savedAttempt)
+            : (savedAttempt ?? serverAttempt ?? createEmptyAttempt());
+        const shouldTrackQuestion = !options?.review && !attempt.submitted;
+        const totalElapsedSeconds = Math.min(
+          MAX_SESSION_SECONDS,
+          Math.max(
+            0,
+            currentState.totalElapsedSeconds +
+              attempt.elapsedSeconds -
+              (savedAttempt?.elapsedSeconds ?? 0),
+          ),
+        );
 
         return {
           ...currentState,
+          totalElapsedSeconds,
           attempts: { ...currentState.attempts, [questionId]: attempt },
           activeQuestionId: shouldTrackQuestion ? questionId : null,
-          isRunning: shouldTrackQuestion && currentState.totalElapsedSeconds < MAX_SESSION_SECONDS,
+          isRunning: shouldTrackQuestion && totalElapsedSeconds < MAX_SESSION_SECONDS,
         };
       });
     },
@@ -280,6 +318,19 @@ export function ProblemSolvingSessionProvider({
     setState(createInitialState());
   }, []);
 
+  const resetQuestion = useCallback((questionId: string) => {
+    setState((currentState) => ({
+      ...currentState,
+      totalElapsedSeconds: Math.max(
+        0,
+        currentState.totalElapsedSeconds - (currentState.attempts[questionId]?.elapsedSeconds ?? 0),
+      ),
+      attempts: { ...currentState.attempts, [questionId]: createEmptyAttempt() },
+      activeQuestionId: null,
+      isRunning: false,
+    }));
+  }, []);
+
   const value = useMemo<ProblemSolvingSessionContextValue>(
     () => ({
       totalElapsedSeconds: state.totalElapsedSeconds,
@@ -292,6 +343,7 @@ export function ProblemSolvingSessionProvider({
       pauseSession,
       finishSession,
       resetSession,
+      resetQuestion,
     }),
     [
       finishSession,
@@ -299,6 +351,7 @@ export function ProblemSolvingSessionProvider({
       isHydrated,
       pauseSession,
       resetSession,
+      resetQuestion,
       saveDraft,
       startQuestion,
       state.attempts,
