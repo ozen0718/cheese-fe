@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '@/api/client';
 import { useCurrentUser } from '@/queries/auth/useCurrentUser';
+import { getVisibleProblemSets } from '@/app/(app)/problem/_utils/getVisibleProblemSets';
 
 import {
   getProblemQuestion,
@@ -40,6 +41,7 @@ export function useProblemSets({ enabled = true }: UserQueryParams = {}) {
   return useQuery({
     retry: retryProblemQuery,
     queryKey: problemQueryKeys.sets(userId ?? ''),
+    select: getVisibleProblemSets,
     queryFn: async ({ signal }) => {
       if (!userId) {
         throw new Error('사용자 정보를 확인할 수 없습니다.');
