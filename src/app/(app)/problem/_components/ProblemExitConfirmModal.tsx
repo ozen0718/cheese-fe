@@ -9,6 +9,7 @@ type ProblemExitConfirmModalProps = {
   onClose: () => void;
   onSaveAndExit: () => void;
   onExitWithoutSave: () => void;
+  isPending?: boolean;
 };
 
 export default function ProblemExitConfirmModal({
@@ -16,9 +17,16 @@ export default function ProblemExitConfirmModal({
   onClose,
   onSaveAndExit,
   onExitWithoutSave,
+  isPending = false,
 }: ProblemExitConfirmModalProps) {
   return (
-    <BaseModal isOpen={isOpen} onClose={onClose} hasOverlay>
+    <BaseModal
+      isOpen={isOpen}
+      onClose={() => {
+        if (!isPending) onClose();
+      }}
+      hasOverlay
+    >
       <section
         role="dialog"
         aria-modal="true"
@@ -31,6 +39,7 @@ export default function ProblemExitConfirmModal({
             aria-label="닫기"
             className="mr-[25px] p-[7px] text-gray-700"
             onClick={onClose}
+            disabled={isPending}
           >
             <CloseIcon className="h-[16px] w-[16px]" aria-hidden="true" focusable="false" />
           </button>
@@ -58,8 +67,9 @@ export default function ProblemExitConfirmModal({
               width={133}
               className="leading-[30px] tracking-normal"
               onClick={onSaveAndExit}
+              disabled={isPending}
             >
-              저장하고 나가기
+              {isPending ? '저장 중' : '저장하고 나가기'}
             </Button>
 
             <Button
@@ -68,6 +78,7 @@ export default function ProblemExitConfirmModal({
               width={165}
               className="leading-[30px] tracking-normal"
               onClick={onExitWithoutSave}
+              disabled={isPending}
             >
               저장하지 않고 나가기
             </Button>

@@ -21,6 +21,8 @@ type ProblemSideTocProps = {
   onClose: () => void;
   navigation?: ProblemSideTocNavigation;
   questionHrefSuffix?: string;
+  isBusy?: boolean;
+  onNavigate?: (href: string) => void;
 };
 
 type SideNavigationButtonProps = {
@@ -28,6 +30,7 @@ type SideNavigationButtonProps = {
   disabled?: boolean;
   direction: 'previous' | 'next';
   label: string;
+  onNavigate?: (href: string) => void;
 };
 
 function cn(...classNames: Array<string | false | null | undefined>) {
@@ -53,6 +56,7 @@ function SideNavigationButton({
   disabled = false,
   direction,
   label,
+  onNavigate,
 }: SideNavigationButtonProps) {
   const isDisabled = disabled || !href;
   const content = (
@@ -72,7 +76,19 @@ function SideNavigationButton({
 
   return (
     <Button asChild variant="outlinePrimary" size={46} fullWidth className="gap-[5px]">
-      <Link href={href}>{content}</Link>
+      <Link
+        href={href}
+        onClick={
+          onNavigate
+            ? (event) => {
+                event.preventDefault();
+                onNavigate(href);
+              }
+            : undefined
+        }
+      >
+        {content}
+      </Link>
     </Button>
   );
 }
@@ -84,6 +100,8 @@ export default function ProblemSideToc({
   onClose,
   navigation,
   questionHrefSuffix = '',
+  isBusy = false,
+  onNavigate,
 }: ProblemSideTocProps) {
   return (
     <aside
@@ -127,6 +145,14 @@ export default function ProblemSideToc({
               >
                 <Link
                   href={`/problem/${problemSetId}/questions/${question.id}${questionHrefSuffix}`}
+                  aria-disabled={isBusy}
+                  onClick={(event) => {
+                    if (isBusy || onNavigate) event.preventDefault();
+                    if (!isBusy && onNavigate)
+                      onNavigate(
+                        `/problem/${problemSetId}/questions/${question.id}${questionHrefSuffix}`,
+                      );
+                  }}
                 >
                   문제 선택
                 </Link>
@@ -141,19 +167,27 @@ export default function ProblemSideToc({
           <div className="grid grid-cols-2 gap-[12px]">
             <SideNavigationButton
               href={navigation.previousHref}
-              disabled={navigation.previousDisabled}
+              disabled={isBusy || navigation.previousDisabled}
+              onNavigate={onNavigate}
               direction="previous"
               label="이전문제"
             />
             <SideNavigationButton
               href={navigation.nextHref}
-              disabled={navigation.nextDisabled}
+              disabled={isBusy || navigation.nextDisabled}
+              onNavigate={onNavigate}
               direction="next"
               label="다음문제"
             />
           </div>
 
-          <Button size={46} fullWidth className="mt-[10px]" onClick={navigation.onExitClick}>
+          <Button
+            size={46}
+            fullWidth
+            className="mt-[10px]"
+            onClick={navigation.onExitClick}
+            disabled={isBusy}
+          >
             저장하고 종료하기
           </Button>
         </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { useCurrentUser } from '@/queries/auth/useCurrentUser';
@@ -48,6 +48,8 @@ export default function ProblemQuestionView({
 
   const [isTocOpen, setIsTocOpen] = useState(false);
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const navigationPending = useRef(false);
 
   const currentUserQuery = useCurrentUser();
   const userId = currentUserQuery.data?.account.userId;
@@ -65,6 +67,7 @@ export default function ProblemQuestionView({
   const selfGradeMutation = useSelfGradeProblemQuestionMutation();
   const retryQuestionMutation = useRetryProblemQuestionMutation();
   const isBusy =
+    isNavigating ||
     saveAnswerMutation.isPending ||
     submitAnswerMutation.isPending ||
     selfGradeMutation.isPending ||
@@ -77,11 +80,20 @@ export default function ProblemQuestionView({
   const question = questionQuery.data;
 
   useEffect(() => {
-    if (isHydrated && question && apiAttempt) {
+    if (isHydrated && question && apiAttempt && !isExitModalOpen && !isNavigating) {
       startQuestion(question.id, { review: isReviewMode, initialAttempt: apiAttempt });
     }
     return pauseSession;
-  }, [apiAttempt, isHydrated, isReviewMode, question, startQuestion, pauseSession]);
+  }, [
+    apiAttempt,
+    isHydrated,
+    isReviewMode,
+    question,
+    startQuestion,
+    pauseSession,
+    isExitModalOpen,
+    isNavigating,
+  ]);
 
   const error = currentUserQuery.error ?? detailQuery.error ?? questionQuery.error;
   const isLoading =
@@ -149,6 +161,7 @@ export default function ProblemQuestionView({
   const completedCount = detail.summary.solvedCount;
 
   const handleNext = () => {
+    if (isBusy) return;
     if (!nextQuestion) {
       finishSession();
       router.push(`/problem/${problemSetId}/result`);
@@ -159,12 +172,14 @@ export default function ProblemQuestionView({
   };
 
   const handleOpenExitModal = () => {
+    if (isBusy) return;
     pauseSession();
     setIsTocOpen(false);
     setIsExitModalOpen(true);
   };
 
   const handleCloseExitModal = () => {
+    if (isBusy) return;
     setIsExitModalOpen(false);
 
     if (isReviewMode || !attempts[question.id]?.submitted) {
@@ -173,6 +188,7 @@ export default function ProblemQuestionView({
   };
 
   const handleHeaderBack = () => {
+    if (isBusy) return;
     if (isReviewMode) {
       pauseSession();
       router.push(`/problem/${problemSetId}/result`);
@@ -182,15 +198,15 @@ export default function ProblemQuestionView({
     handleOpenExitModal();
   };
 
-  const handleSaveAndExit = async () => {
-    const attempt = attempts[question.id] ?? apiAttempt;
-    const hasDraft =
-      question.type === 'shortAnswer'
-        ? Boolean(attempt.answer.trim())
-        : Boolean(attempt.selectedChoiceId);
+  const handleSaveAndNavigate = async (href: string) => {
+    if (isBusy || navigationPending.current) return;
+    navigationPending.current = true;
+    setIsNavigating(true);
+    pauseSession();
+    const attempt = initialAttempt;
 
     try {
-      if (!attempt.submitted && hasDraft) {
+      if (!attempt.submitted && !isReviewMode) {
         await saveAnswerMutation.mutateAsync({
           userId,
           problemSetId,
@@ -205,13 +221,17 @@ export default function ProblemQuestionView({
       }
 
       pauseSession();
-      router.push(`/problem/${problemSetId}`);
+      setIsTocOpen(false);
+      router.push(href);
     } catch (saveError) {
       window.alert(
         saveError instanceof Error
           ? saveError.message
           : '진행도를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.',
       );
+    } finally {
+      navigationPending.current = false;
+      setIsNavigating(false);
     }
   };
 
@@ -229,7 +249,7 @@ export default function ProblemQuestionView({
         current={completedCount}
         total={detail.questions.length}
         onMenuClick={() => {
-          setIsTocOpen(true);
+          if (!isBusy) setIsTocOpen(true);
         }}
       />
 
@@ -337,15 +357,21 @@ export default function ProblemQuestionView({
           onExitClick: handleOpenExitModal,
         }}
         questionHrefSuffix={reviewQuery}
+        isBusy={isBusy}
+        onNavigate={(href) => {
+          void handleSaveAndNavigate(href);
+        }}
       />
 
       <ProblemExitConfirmModal
         isOpen={isExitModalOpen}
         onClose={handleCloseExitModal}
+        isPending={isBusy}
         onSaveAndExit={() => {
-          void handleSaveAndExit();
+          void handleSaveAndNavigate(`/problem/${problemSetId}`);
         }}
         onExitWithoutSave={() => {
+          if (isBusy) return;
           resetSession();
           router.push(`/problem/${problemSetId}`);
         }}
