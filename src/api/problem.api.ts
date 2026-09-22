@@ -84,12 +84,11 @@ export type SaveProblemAnswer = {
   elapsedSeconds: number;
 };
 
-type UserRequest = {
-  userId: string;
+type ProblemRequest = {
   signal?: AbortSignal;
 };
 
-type ProblemSetRequest = UserRequest & {
+type ProblemSetRequest = ProblemRequest & {
   problemSetId: string;
 };
 
@@ -109,101 +108,73 @@ function toSaveAnswerBody(answer: SaveProblemAnswer) {
   };
 }
 
-export function getProblemSets({ userId, signal }: UserRequest) {
+export function getProblemSets({ signal }: ProblemRequest = {}) {
   return apiClient<ApiProblemSetSummary[]>('/backend-api/problem-sets', {
     method: 'GET',
-    query: { userId },
     signal,
     cache: 'no-store',
   });
 }
 
-export function getProblemSetDetail({ userId, problemSetId, signal }: ProblemSetRequest) {
+export function getProblemSetDetail({ problemSetId, signal }: ProblemSetRequest) {
   return apiClient<ApiProblemSetDetail>(`/backend-api/problem-sets/${problemSetId}`, {
     method: 'GET',
-    query: { userId },
     signal,
     cache: 'no-store',
   });
 }
 
-export function getProblemQuestion({
-  userId,
-  problemSetId,
-  questionId,
-  signal,
-}: ProblemQuestionRequest) {
+export function getProblemQuestion({ problemSetId, questionId, signal }: ProblemQuestionRequest) {
   return apiClient<ApiProblemQuestion>(
     `/backend-api/problem-sets/${problemSetId}/questions/${questionId}`,
     {
       method: 'GET',
-      query: { userId },
       signal,
       cache: 'no-store',
     },
   );
 }
 
-export function saveProblemAnswer({
-  userId,
-  problemSetId,
-  questionId,
-  answer,
-}: ProblemAnswerRequest) {
+export function saveProblemAnswer({ problemSetId, questionId, answer }: ProblemAnswerRequest) {
   return apiClient<ApiProblemQuestion>(
     `/backend-api/problem-sets/${problemSetId}/questions/${questionId}/answer`,
     {
       method: 'PUT',
-      query: { userId },
       body: JSON.stringify(toSaveAnswerBody(answer)),
     },
   );
 }
 
-export function submitProblemAnswer({
-  userId,
-  problemSetId,
-  questionId,
-  answer,
-}: ProblemAnswerRequest) {
+export function submitProblemAnswer({ problemSetId, questionId, answer }: ProblemAnswerRequest) {
   return apiClient<ApiProblemQuestion>(
     `/backend-api/problem-sets/${problemSetId}/questions/${questionId}/submit`,
     {
       method: 'POST',
-      query: { userId },
       body: JSON.stringify(toSaveAnswerBody(answer)),
     },
   );
 }
 
-export function skipProblemQuestion({
-  userId,
-  problemSetId,
-  questionId,
-  answer,
-}: ProblemAnswerRequest) {
+export function skipProblemQuestion({ problemSetId, questionId, answer }: ProblemAnswerRequest) {
   return apiClient<ApiProblemQuestion>(
     `/backend-api/problem-sets/${problemSetId}/questions/${questionId}/skip`,
     {
       method: 'POST',
-      query: { userId },
       body: JSON.stringify(toSaveAnswerBody(answer)),
     },
   );
 }
 
-export function getProblemSetResult({ userId, problemSetId, signal }: ProblemSetRequest) {
+export function getProblemSetResult({ problemSetId, signal }: ProblemSetRequest) {
   return apiClient<ApiProblemSetResult>(`/backend-api/problem-sets/${problemSetId}/result`, {
     method: 'GET',
-    query: { userId },
     signal,
     cache: 'no-store',
   });
 }
 
-export function retryProblemSet({ userId, problemSetId }: ProblemSetRequest) {
+export function retryProblemSet({ problemSetId }: ProblemSetRequest) {
   return apiClient<ApiProblemSetDetail>(`/backend-api/problem-sets/${problemSetId}/retry`, {
     method: 'POST',
-    query: { userId },
   });
 }
