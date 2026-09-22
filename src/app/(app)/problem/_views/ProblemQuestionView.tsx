@@ -6,61 +6,24 @@ import { useRouter } from 'next/navigation';
 import { useCurrentUser } from '@/queries/auth/useCurrentUser';
 import {
   useSaveProblemAnswerMutation,
+  useSelfGradeProblemQuestionMutation,
   useSubmitProblemAnswerMutation,
 } from '@/queries/problem/useProblemMutations';
-import {
-  useProblemQuestion,
-  useProblemSetDetail,
-  useProblemSetResult,
-} from '@/queries/problem/useProblemQueries';
+import { useProblemQuestion, useProblemSetDetail } from '@/queries/problem/useProblemQueries';
 
 import ProblemExitConfirmModal from '../_components/ProblemExitConfirmModal';
 import ProblemQuestionCard from '../_components/ProblemQuestionCard';
 import ProblemSideToc from '../_components/ProblemSideToc';
 import ProblemSolvingHeader from '../_components/ProblemSolvingHeader';
 import { useProblemSolvingSession } from '../_contexts/ProblemSolvingSessionContext';
-import type { ProblemAttempt, ProblemQuestion } from '../_types/problemSolving';
 import { formatElapsedTime } from '../_utils/formatElapsedTime';
+import { mapProblemAttempt } from '../_utils/mapProblemAttempt';
 
 type ProblemQuestionViewProps = {
   problemSetId: string;
   questionId: string;
   isReviewMode?: boolean;
 };
-
-function createApiAttempt(question: ProblemQuestion, isReviewMode: boolean): ProblemAttempt {
-  const status =
-    question.status === 'correct'
-      ? 'correct'
-      : question.status === 'incorrect'
-        ? 'incorrect'
-        : 'pending';
-  const submitted = status !== 'pending';
-
-  return {
-    answer: question.myAnswer?.answer ?? '',
-    selectedChoiceId: question.myAnswer?.selectedChoiceId ?? '',
-    status,
-    elapsedSeconds: question.elapsedSeconds ?? 0,
-    submitted,
-    selfChecked: submitted && (question.type === 'multipleChoice' || isReviewMode),
-  };
-}
-
-function getAnswerLabel(
-  answer: { selectedChoiceId?: string; answer?: string } | undefined,
-  question: ProblemQuestion | undefined,
-) {
-  if (answer?.answer) {
-    return answer.answer;
-  }
-
-  if (answer?.selectedChoiceId) {
-    return question?.choices?.find((choice) => choice.id === answer.selectedChoiceId)?.label;
-  }
-
-  return undefined;
-}
 
 export default function ProblemQuestionView({
   problemSetId,
@@ -95,47 +58,30 @@ export default function ProblemQuestionView({
     questionId,
     enabled: currentUserQuery.isSuccess,
   });
-  const resultQuery = useProblemSetResult({
-    problemSetId,
-    enabled: currentUserQuery.isSuccess && isReviewMode,
-  });
   const saveAnswerMutation = useSaveProblemAnswerMutation();
   const submitAnswerMutation = useSubmitProblemAnswerMutation();
+  const selfGradeMutation = useSelfGradeProblemQuestionMutation();
+  const isBusy =
+    saveAnswerMutation.isPending || submitAnswerMutation.isPending || selfGradeMutation.isPending;
 
   const apiAttempt = useMemo(
-    () => (questionQuery.data ? createApiAttempt(questionQuery.data, isReviewMode) : undefined),
-    [isReviewMode, questionQuery.data],
+    () => (questionQuery.data ? mapProblemAttempt(questionQuery.data) : undefined),
+    [questionQuery.data],
   );
-  const resultQuestion = resultQuery.data?.questions.find((item) => item.id === questionId);
-  const question = useMemo(() => {
-    if (!questionQuery.data) {
-      return undefined;
-    }
-
-    return {
-      ...questionQuery.data,
-      correctAnswer: getAnswerLabel(resultQuestion?.correctAnswer, questionQuery.data),
-    };
-  }, [questionQuery.data, resultQuestion?.correctAnswer]);
+  const question = questionQuery.data;
 
   useEffect(() => {
     if (isHydrated && question && apiAttempt) {
       startQuestion(question.id, { review: isReviewMode, initialAttempt: apiAttempt });
     }
-  }, [apiAttempt, isHydrated, isReviewMode, question, startQuestion]);
+    return pauseSession;
+  }, [apiAttempt, isHydrated, isReviewMode, question, startQuestion, pauseSession]);
 
-  const error =
-    currentUserQuery.error ??
-    detailQuery.error ??
-    questionQuery.error ??
-    (isReviewMode ? resultQuery.error : null);
+  const error = currentUserQuery.error ?? detailQuery.error ?? questionQuery.error;
   const isLoading =
     !error &&
     (currentUserQuery.isPending ||
-      (Boolean(userId) &&
-        (detailQuery.isPending ||
-          questionQuery.isPending ||
-          (isReviewMode && resultQuery.isPending))));
+      (Boolean(userId) && (detailQuery.isPending || questionQuery.isPending)));
 
   if (isLoading) {
     return (
@@ -159,11 +105,7 @@ export default function ProblemQuestionView({
               return;
             }
 
-            void Promise.all([
-              detailQuery.refetch(),
-              questionQuery.refetch(),
-              ...(isReviewMode ? [resultQuery.refetch()] : []),
-            ]);
+            void Promise.all([detailQuery.refetch(), questionQuery.refetch()]);
           }}
         >
           다시 시도
@@ -197,17 +139,8 @@ export default function ProblemQuestionView({
   const reviewQuery = isReviewMode ? '?from=result' : '';
   const sessionAttempt = attempts[question.id];
   const initialAttempt =
-    !isReviewMode && question.type === 'shortAnswer' && sessionAttempt?.submitted
-      ? sessionAttempt
-      : apiAttempt.submitted
-        ? apiAttempt
-        : (sessionAttempt ?? apiAttempt);
-  const completedCount = new Set([
-    ...detail.questions.filter((item) => item.status !== 'notStarted').map((item) => item.id),
-    ...Object.entries(attempts)
-      .filter(([, attempt]) => attempt.submitted)
-      .map(([id]) => id),
-  ]).size;
+    apiAttempt.submitted || sessionAttempt?.submitted ? apiAttempt : (sessionAttempt ?? apiAttempt);
+  const completedCount = detail.summary.solvedCount;
 
   const handleNext = () => {
     if (!nextQuestion) {
@@ -297,11 +230,12 @@ export default function ProblemQuestionView({
       <div className="flex min-h-[calc(100dvh-80px)] items-center justify-center py-[60px]">
         {isHydrated && (
           <ProblemQuestionCard
-            key={`${question.id}:${isReviewMode ? 'review' : 'solve'}`}
+            key={JSON.stringify([question.id, isReviewMode, question.status, question.myAnswer])}
             question={question}
             initialAttempt={initialAttempt}
             isLastQuestion={isLastQuestion}
             isReviewMode={isReviewMode}
+            isBusy={isBusy}
             onDraftChange={(draft) => {
               saveDraft(question.id, draft);
             }}
@@ -332,7 +266,10 @@ export default function ProblemQuestionView({
                   submittedQuestion.myAnswer?.selectedChoiceId ?? submission.selectedChoiceId,
               };
 
-              if (question.type === 'shortAnswer') {
+              if (
+                submittedQuestion.gradingMode === 'self' &&
+                submittedQuestion.status === 'awaitingSelfGrade'
+              ) {
                 submitQuestion(question.id, { ...submittedAnswer, status: 'pending' });
                 return null;
               }
@@ -346,7 +283,16 @@ export default function ProblemQuestionView({
               return status;
             }}
             onSelfCheck={async (status) => {
-              gradeQuestion(question.id, status);
+              const gradedQuestion = await selfGradeMutation.mutateAsync({
+                userId,
+                problemSetId,
+                questionId: question.id,
+                status: status === 'correct' ? 'correct' : 'wrong',
+              });
+              if (gradedQuestion.status !== 'correct' && gradedQuestion.status !== 'incorrect') {
+                throw new Error('채점 결과를 확인할 수 없습니다.');
+              }
+              gradeQuestion(question.id, gradedQuestion.status);
             }}
             onRetry={() => {
               window.alert('문제별 다시풀기는 서버 API가 지원된 이후 연결될 예정입니다.');
