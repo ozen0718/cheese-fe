@@ -345,7 +345,7 @@ export default function ProblemQuestionView({
 
               return status;
             }}
-            onSelfCheck={(status) => {
+            onSelfCheck={async (status) => {
               gradeQuestion(question.id, status);
             }}
             onRetry={() => {
