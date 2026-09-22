@@ -92,6 +92,15 @@ export type SaveProblemAnswer = {
   elapsedSeconds: number;
 };
 
+export type ApiProblemQuestionRetry = {
+  problemSetId: string;
+  questionId: string;
+  status: 'notStarted';
+  myAnswer?: ApiProblemAnswer | null;
+  elapsedSeconds: number;
+  message: string;
+};
+
 type ProblemRequest = {
   signal?: AbortSignal;
 };
@@ -185,4 +194,25 @@ export function retryProblemSet({ problemSetId }: ProblemSetRequest) {
   return apiClient<ApiProblemSetDetail>(`/backend-api/problem-sets/${problemSetId}/retry`, {
     method: 'POST',
   });
+}
+
+export function retryProblemQuestion({ problemSetId, questionId }: ProblemQuestionRequest) {
+  return apiClient<ApiProblemQuestionRetry>(
+    `/backend-api/problem-sets/${problemSetId}/questions/${questionId}/retry`,
+    { method: 'POST' },
+  );
+}
+
+export function selfGradeProblemQuestion({
+  problemSetId,
+  questionId,
+  status,
+}: ProblemQuestionRequest & { status: 'correct' | 'wrong' }) {
+  return apiClient<ApiProblemQuestion>(
+    `/backend-api/problem-sets/${problemSetId}/questions/${questionId}/self-grade`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    },
+  );
 }
